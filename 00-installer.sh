@@ -188,6 +188,14 @@ log "Installation target disk set to '$DISK'."
 }
 
 # --- Execution Engine ---
+
+# --- FUNCTION DEFINITIONS ---
+
+unmount_all() {
+    log "Ensuring all partitions under /mnt are unmounted..."
+    # The -R (recursive) flag is key. The || true prevents exit on error if nothing was mounted.
+    umount -R /mnt 2>/dev/null || true
+}
 partition_and_format() {
     log "Wiping disk and creating new partitions on $DISK..."
     umount -A --recursive /mnt 2>/dev/null || true
@@ -210,6 +218,7 @@ partition_and_format() {
 }
 
 mount_filesystems() {
+    unmount_all
     log "Mounting filesystems..."
     case "$FS_CHOICE" in
         btrfs)
@@ -236,16 +245,29 @@ mount_filesystems() {
 }
 
 create_swapfile() {
+    # Check if the user chose to create a swap file (0 means Yes)
     if [ "$CREATE_SWAP" -eq 0 ]; then
         log "Creating ${RECOMMENDED_SWAP}GiB swap file..."
         local SWAP_PATH="/mnt/swap/swapfile"
-        # Disable Copy-on-Write for the swapfile on BTRFS
-        [[ "$FS_CHOICE" == "btrfs" ]] && touch "$SWAP_PATH" && chattr +C "$SWAP_PATH"
+
+        # Ensure the /mnt/swap directory exists (for both ext4 and btrfs)
+        mkdir -p "$(dirname "$SWAP_PATH")"
+
+        # For BTRFS, we must disable Copy-on-Write (CoW) on the swapfile
+        if [[ "$FS_CHOICE" == "btrfs" ]]; then
+            log "Disabling CoW for BTRFS swapfile..."
+            # An empty file must exist before we can set the attribute
+            touch "$SWAP_PATH"
+            chattr +C "$SWAP_PATH"
+        fi
+
         dd if=/dev/zero of="$SWAP_PATH" bs=1G count="$RECOMMENDED_SWAP" status=progress
         chmod 600 "$SWAP_PATH"
         mkswap "$SWAP_PATH"
         swapon "$SWAP_PATH"
         log "Swap file created and enabled."
+    else
+        log "Skipping swap file creation as per user choice."
     fi
 }
 
