@@ -63,16 +63,38 @@ gather_user_input() {
     [[ $? -ne 0 ]] && error "Installation cancelled by user." && exit
     loadkeys "$KEYMAP"
 
-    # Timezone
-    TIMEZONE=$(run_dialog --title "Timezone Selection" --menu "Select your world region." 15 70 5 "Europe" "" "America" "" "Asia" "" "Australia" "" "Etc" "")
-    [[ $? -ne 0 ]] && error "Installation cancelled by user." && exit
-    local ZONE_OPTIONS
-    ZONE_OPTIONS=$(timedatectl list-timezones | grep "^$TIMEZONE/" | sed "s#$TIMEZONE/##" | awk '{print $1 " \"\""}' | tr '\n' ' ')
-    local SUB_TIMEZONE
-    SUB_TIMEZONE=$(run_dialog --title "City/Area Selection" --menu "Select your city or area." 20 70 15 $(echo "$ZONE_OPTIONS"))
-    [[ $? -ne 0 ]] && error "Installation cancelled by user." && exit
-    TIMEZONE="$TIMEZONE/$SUB_TIMEZONE"
+    # --- NEW, IMPROVED TIMEZONE SELECTION ---
 
+    while true; do
+    # First, let the user pick a major region.
+    TIMEZONE_REGION=$(run_dialog --title "Timezone Selection" --menu "Select your world region." 15 70 5 "Europe" "" "America" "" "Asia" "" "Australia" "" "Etc" "")
+    if [[ $? -ne 0 ]]; then error "Installation cancelled by user."; fi
+
+    # Second, generate a list of specific zones within that region.
+    # We add a check to ensure this list is not empty.
+    ZONE_OPTIONS=$(timedatectl list-timezones | grep "^$TIMEZONE_REGION/" | sed "s#$TIMEZONE_REGION/##" | awk '{print $1 " \"\""}' | tr '\n' ' ')
+
+    if [[ -z "$ZONE_OPTIONS" ]]; then
+        # If the list is empty, the region is invalid for this method. Show an error and loop again.
+        run_dialog --title "Error" --msgbox "The selected region '$TIMEZONE_REGION' has no sub-zones to choose from.\n\nPlease select another region." 10 70
+        continue # Go back to the beginning of the while loop
+    fi
+
+    # If the list is valid, show the second menu to select the city/area.
+    SUB_TIMEZONE=$(run_dialog --title "City/Area Selection" --menu "Select your city or area." 20 70 15 $(echo "$ZONE_OPTIONS"))
+    if [[ $? -ne 0 ]]; then error "Installation cancelled by user."; fi
+
+    # If we have a sub-zone, construct the full timezone, log it, and break the loop.
+    if [[ -n "$SUB_TIMEZONE" ]]; then
+        TIMEZONE="$TIMEZONE_REGION/$SUB_TIMEZONE"
+        log "Timezone set to '$TIMEZONE'."
+        break
+    else
+        # This case handles if the user presses OK on an empty selection in the second menu.
+        run_dialog --title "Error" --msgbox "You did not select a valid zone. Please try again." 8 50
+    fi
+    done
+    
     # Disk Selection
     mapfile -t DISK_ENTRIES < <(lsblk -dpno NAME,SIZE,MODEL | grep 'disk' | awk '{print $1 " \"" $2 " " $3 "\""}')
     DISK=$(run_dialog --title "Disk Selection" --menu "Select the disk to install Arch Linux on.\nWARNING: THIS DISK WILL BE COMPLETELY WIPED." 20 70 15 "${DISK_ENTRIES[@]}")
