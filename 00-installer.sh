@@ -95,18 +95,39 @@ gather_user_input() {
     fi
     done
     
-    # Disk Selection
-    mapfile -t DISK_ENTRIES < <(lsblk -dpno NAME,SIZE,MODEL | grep 'disk' | awk '{print $1 " \"" $2 " " $3 "\""}')
-    DISK=$(run_dialog --title "Disk Selection" --menu "Select the disk to install Arch Linux on.\nWARNING: THIS DISK WILL BE COMPLETELY WIPED." 20 70 15 "${DISK_ENTRIES[@]}")
-    [[ $? -ne 0 ]] && error "Installation cancelled by user." && exit
+     # --- NEW, IMPROVED DISK SELECTION ---
 
-    # Filesystem Choice
-    FS_CHOICE=$(run_dialog --title "Filesystem Choice" --radiolist "Select a filesystem." 15 70 2 "btrfs" "Modern, with snapshots (Recommended)" ON "ext4" "Traditional and stable" OFF)
-    [[ $? -ne 0 ]] && error "Installation cancelled by user." && exit
-    case $FS_CHOICE in
-        btrfs) run_dialog --title "Explainer: btrfs" --msgbox "You chose 'btrfs'.\n\nThis allows for system snapshots (restore points), which is excellent for a rolling-release distro like Arch. It's the recommended modern choice." 11 70 ;;
-        ext4) run_dialog --title "Explainer: ext4" --msgbox "You chose 'ext4'.\n\nThis is the classic Linux filesystem. It's incredibly stable and simple, but lacks advanced features like built-in snapshots." 11 70 ;;
-    esac
+# Create an array to hold the menu entries for the dialog command
+declare -a DISK_ENTRIES=()
+
+# Read the output of lsblk line by line
+while read -r line; do
+    # Each line is expected to be like: /dev/sda 100G SomeModel
+    # We use 'read' to safely split the line into variables.
+    read -r -a device_info <<< "$line"
+    local device_name="${device_info[0]}"
+    local device_size="${device_info[1]}"
+    # The rest of the line is the model; handles cases where model is empty or has spaces.
+    local device_model="${device_info[@]:2}"
+
+    # Add the formatted entry to our array
+    DISK_ENTRIES+=("$device_name" "$device_size $device_model")
+done < <(lsblk -dpno NAME,SIZE,MODEL | grep 'disk')
+
+# Check if we actually found any disks before trying to show the menu
+if [ ${#DISK_ENTRIES[@]} -eq 0 ]; then
+    run_dialog --title "Error" --msgbox "No suitable disks found for installation.\n\nPlease check your hardware or virtual machine configuration." 10 60
+    error "Could not detect any block devices to install to."
+fi
+
+DISK=$(run_dialog --title "Disk Selection" --menu "Select the disk to install Arch Linux on.\nWARNING: THIS DISK WILL BE COMPLETELY WIPED." 20 70 15 "${DISK_ENTRIES[@]}")
+
+# Exit if user hits 'Cancel' or 'Esc'
+if [[ $? -ne 0 ]]; then
+    error "Installation cancelled by user."
+fi
+
+log "Installation target disk set to '$DISK'."
 
     # Bootloader Choice
     BOOTLOADER_CHOICE=$(run_dialog --title "Bootloader Choice" --radiolist "Select a bootloader." 15 70 2 "systemd-boot" "Simple, fast, and clean (for single-OS setups)" ON "grub" "Feature-rich (for multi-boot & snapshot booting)" OFF)
