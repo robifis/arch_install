@@ -95,7 +95,7 @@ gather_user_input() {
     fi
     done
     
-     # --- NEW, IMPROVED DISK SELECTION ---
+    # --- NEW, IMPROVED DISK SELECTION ---
 
 # Create an array to hold the menu entries for the dialog command
 declare -a DISK_ENTRIES=()
@@ -128,7 +128,6 @@ if [[ $? -ne 0 ]]; then
 fi
 
 log "Installation target disk set to '$DISK'."
-
     # Bootloader Choice
     BOOTLOADER_CHOICE=$(run_dialog --title "Bootloader Choice" --radiolist "Select a bootloader." 15 70 2 "systemd-boot" "Simple, fast, and clean (for single-OS setups)" ON "grub" "Feature-rich (for multi-boot & snapshot booting)" OFF)
     [[ $? -ne 0 ]] && error "Installation cancelled by user." && exit
