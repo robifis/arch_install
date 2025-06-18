@@ -174,8 +174,13 @@ log "Installation target disk set to '$DISK'."
         if [[ "$ROOT_PASSWORD" == "$ROOT_PASSWORD_CONFIRM" ]]; then break; else run_dialog --title "Error" --msgbox "Passwords do not match." 8 40; fi
     done
 
-    # --- NEW, FULLY ROBUST FINAL CONFIRMATION ---
+    # --- NEW, DEFINITIVELY CORRECTED FINAL CONFIRMATION ---
 
+# Create a temporary file to store the dialog choice. This is the most reliable method.
+local choice_file
+choice_file=$(mktemp)
+
+# Build the menu options
 local summary_options=(
     "Disk:"             "$DISK"
     "Filesystem:"       "$FS_CHOICE"
@@ -188,17 +193,21 @@ local summary_options=(
     "PROCEED"           "Start the installation (DESTRUCTIVE ACTION)"
 )
 
+# Run dialog, redirecting the output (stderr) to our temporary file.
+dialog --title "Final Confirmation" --menu "Please review all settings. You MUST select 'PROCEED' to begin." 20 70 15 "${summary_options[@]}" 2> "$choice_file"
+local exit_status=$? # Capture the exit status (0 for OK, 1 for Cancel/Esc)
+
+# Read the choice back from the temporary file.
 local choice
-choice=$(run_dialog --title "Final Confirmation" --menu "Please review all settings. You MUST select 'PROCEED' to begin." 20 70 15 "${summary_options[@]}")
+choice=$(cat "$choice_file")
+rm -f "$choice_file" # Clean up the temporary file immediately
 
 # STEP 1: First, check the exit code to see if the user pressed 'Esc' or 'Cancel'.
-# This is the only reliable way to detect a cancellation.
-if [[ $? -ne 0 ]]; then
+if [[ $exit_status -ne 0 ]]; then
     error "Installation cancelled by user at final confirmation."
 fi
 
 # STEP 2: Second, check the content of the choice.
-# This ensures the user explicitly selected the 'PROCEED' option.
 if [[ "$choice" != "PROCEED" ]]; then
     error "Installation aborted. 'PROCEED' was not the selected option."
 fi
