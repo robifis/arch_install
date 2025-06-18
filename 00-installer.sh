@@ -174,9 +174,8 @@ log "Installation target disk set to '$DISK'."
         if [[ "$ROOT_PASSWORD" == "$ROOT_PASSWORD_CONFIRM" ]]; then break; else run_dialog --title "Error" --msgbox "Passwords do not match." 8 40; fi
     done
 
-    # --- NEW, ROBUST FINAL CONFIRMATION ---
+    # --- NEW, FULLY ROBUST FINAL CONFIRMATION ---
 
-# Build an array for the dialog menu. This is safer than a single string.
 local summary_options=(
     "Disk:"             "$DISK"
     "Filesystem:"       "$FS_CHOICE"
@@ -190,13 +189,22 @@ local summary_options=(
 )
 
 local choice
-choice=$(run_dialog --title "Final Confirmation" --menu "Please review all settings before proceeding. The selected disk will be erased. Select 'PROCEED' to begin." 20 70 15 "${summary_options[@]}")
+choice=$(run_dialog --title "Final Confirmation" --menu "Please review all settings. You MUST select 'PROCEED' to begin." 20 70 15 "${summary_options[@]}")
 
-# Check if the user selected "PROCEED". If they selected anything else or
-# cancelled (pressed Esc), we abort the installation.
-if [[ "$choice" != "PROCEED" ]]; then
+# STEP 1: First, check the exit code to see if the user pressed 'Esc' or 'Cancel'.
+# This is the only reliable way to detect a cancellation.
+if [[ $? -ne 0 ]]; then
     error "Installation cancelled by user at final confirmation."
 fi
+
+# STEP 2: Second, check the content of the choice.
+# This ensures the user explicitly selected the 'PROCEED' option.
+if [[ "$choice" != "PROCEED" ]]; then
+    error "Installation aborted. 'PROCEED' was not the selected option."
+fi
+
+# If we get here, it means the user explicitly selected "PROCEED" and pressed OK.
+log "Final confirmation received. The user has chosen to proceed."
 }
 
 # --- Execution Engine ---
