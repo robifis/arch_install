@@ -97,10 +97,15 @@ gather_user_input() {
     
     # --- NEW, IMPROVED DISK SELECTION ---
 
+    # --- NEW, FULLY CORRECTED DISK SELECTION ---
+
 # Create an array to hold the menu entries for the dialog command
 declare -a DISK_ENTRIES=()
 
-# Read the output of lsblk line by line
+log "Detecting available block devices..."
+
+# Read the output of lsblk line by line.
+# The faulty "| grep 'disk'" has been removed.
 while read -r line; do
     # Each line is expected to be like: /dev/sda 100G SomeModel
     # We use 'read' to safely split the line into variables.
@@ -112,11 +117,11 @@ while read -r line; do
 
     # Add the formatted entry to our array
     DISK_ENTRIES+=("$device_name" "$device_size $device_model")
-done < <(lsblk -dpno NAME,SIZE,MODEL | grep 'disk')
+done < <(lsblk -dpno NAME,SIZE,MODEL)
 
 # Check if we actually found any disks before trying to show the menu
 if [ ${#DISK_ENTRIES[@]} -eq 0 ]; then
-    run_dialog --title "Error" --msgbox "No suitable disks found for installation.\n\nPlease check your hardware or virtual machine configuration." 10 60
+    run_dialog --title "Error" --msgbox "No block devices found for installation.\n\nPlease check your hardware or virtual machine configuration." 10 60
     error "Could not detect any block devices to install to."
 fi
 
@@ -128,6 +133,7 @@ if [[ $? -ne 0 ]]; then
 fi
 
 log "Installation target disk set to '$DISK'."
+
     # Bootloader Choice
     BOOTLOADER_CHOICE=$(run_dialog --title "Bootloader Choice" --radiolist "Select a bootloader." 15 70 2 "systemd-boot" "Simple, fast, and clean (for single-OS setups)" ON "grub" "Feature-rich (for multi-boot & snapshot booting)" OFF)
     [[ $? -ne 0 ]] && error "Installation cancelled by user." && exit
