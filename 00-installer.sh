@@ -174,17 +174,29 @@ log "Installation target disk set to '$DISK'."
         if [[ "$ROOT_PASSWORD" == "$ROOT_PASSWORD_CONFIRM" ]]; then break; else run_dialog --title "Error" --msgbox "Passwords do not match." 8 40; fi
     done
 
-    # Final Confirmation
-    local SUMMARY="Your Arch Linux installation is ready to begin with the following settings:\n\n\
-    Disk:            $DISK\n\
-    Filesystem:      $FS_CHOICE\n\
-    Bootloader:      $BOOTLOADER_CHOICE\n\
-    Create Swap:     $(if [ $CREATE_SWAP -eq 0 ]; then echo 'Yes'; else echo 'No'; fi)\n\
-    Username:        $USERNAME\n\
-    Timezone:        $TIMEZONE\n\n\
-    WARNING: The disk $DISK will be completely erased. This is your final chance to cancel."
-    run_dialog --title "Confirm Installation" --yesno "$SUMMARY" 20 70
-    [[ $? -ne 0 ]] && error "Installation cancelled by user." && exit
+    # --- NEW, ROBUST FINAL CONFIRMATION ---
+
+# Build an array for the dialog menu. This is safer than a single string.
+local summary_options=(
+    "Disk:"             "$DISK"
+    "Filesystem:"       "$FS_CHOICE"
+    "Bootloader:"       "$BOOTLOADER_CHOICE"
+    "Swap:"             "$(if [ $CREATE_SWAP -eq 0 ]; then echo 'Yes'; else echo 'No'; fi)"
+    "Username:"         "$USERNAME"
+    "Timezone:"         "$TIMEZONE"
+    "Keyboard:"         "$KEYMAP"
+    "---"               "-----------------------------------------"
+    "PROCEED"           "Start the installation (DESTRUCTIVE ACTION)"
+)
+
+local choice
+choice=$(run_dialog --title "Final Confirmation" --menu "Please review all settings before proceeding. The selected disk will be erased. Select 'PROCEED' to begin." 20 70 15 "${summary_options[@]}")
+
+# Check if the user selected "PROCEED". If they selected anything else or
+# cancelled (pressed Esc), we abort the installation.
+if [[ "$choice" != "PROCEED" ]]; then
+    error "Installation cancelled by user at final confirmation."
+fi
 }
 
 # --- Execution Engine ---
