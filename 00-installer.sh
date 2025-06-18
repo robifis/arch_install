@@ -176,11 +176,11 @@ log "Installation target disk set to '$DISK'."
 
     # --- NEW, DEFINITIVELY CORRECTED FINAL CONFIRMATION ---
 
-# Create a temporary file to store the dialog choice. This is the most reliable method.
+# Create a temporary file to store the dialog choice.
 local choice_file
 choice_file=$(mktemp)
 
-# Build the menu options
+# Build the menu options array.
 local summary_options=(
     "Disk:"             "$DISK"
     "Filesystem:"       "$FS_CHOICE"
@@ -193,8 +193,11 @@ local summary_options=(
     "PROCEED"           "Start the installation (DESTRUCTIVE ACTION)"
 )
 
-# Run dialog, redirecting the output (stderr) to our temporary file.
-dialog --title "Final Confirmation" --menu "Please review all settings. You MUST select 'PROCEED' to begin." 20 70 15 "${summary_options[@]}" 2> "$choice_file"
+# Call dialog directly, without any helper functions.
+# The key is `2> "$choice_file"`, which tells dialog to write its output
+# (the selected tag, e.g., "PROCEED") directly to our temp file.
+# The UI itself is drawn on stdout, which goes to the screen.
+dialog --title "Final Confirmation" --menu "Please review all settings. You MUST select 'PROCEED' to begin." 20 70 15 "${summary_options[@]}" 2>"$choice_file"
 local exit_status=$? # Capture the exit status (0 for OK, 1 for Cancel/Esc)
 
 # Read the choice back from the temporary file.
@@ -202,14 +205,18 @@ local choice
 choice=$(cat "$choice_file")
 rm -f "$choice_file" # Clean up the temporary file immediately
 
-# STEP 1: First, check the exit code to see if the user pressed 'Esc' or 'Cancel'.
+# --- Logic Check ---
+# STEP 1: First, check if the user pressed 'Esc' or 'Cancel'.
 if [[ $exit_status -ne 0 ]]; then
+    # The user explicitly cancelled the dialog box.
     error "Installation cancelled by user at final confirmation."
 fi
 
-# STEP 2: Second, check the content of the choice.
+# STEP 2: Second, check if the choice read from the file is 'PROCEED'.
 if [[ "$choice" != "PROCEED" ]]; then
-    error "Installation aborted. 'PROCEED' was not the selected option."
+    # This handles the case where the user presses 'OK' but hasn't
+    # highlighted the 'PROCEED' option.
+    error "Installation aborted. 'PROCEED' was not the selected option. You selected: '$choice'"
 fi
 
 # If we get here, it means the user explicitly selected "PROCEED" and pressed OK.
