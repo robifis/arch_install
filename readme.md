@@ -41,7 +41,7 @@ This framework is designed to perform a complete installation of Arch Linux. The
 2.  Clone this repository into a folder named `arch-setup` on the same USB drive.
     ```bash
     # On your current machine, with the USB mounted
-    git clone https://github.com/robifis/universal_dotfiles.git /path/to/usb/arch-setup
+    git clone https://github.com/robifis/arch_install.git arch-setup
     ```
 
 ### Step 2: Running the Installer (From the Arch ISO)
